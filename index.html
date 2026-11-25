@@ -319,7 +319,7 @@ table.calc tr.total td { font-weight: 700; font-size: 1.05rem; border-bottom: 0;
     return `${y}-${pad(mo)}-${pad(d)}`;
   }
   const dmyOf = iso => { if (!iso) return ""; const [y, m, d] = iso.split("-"); return `${d}/${m}/${y}`; };
-  const dmy = text => { const iso = isoOf(text); return iso ? dmyOf(iso) : (String(text || "").trim() || "……/……/202…"); };
+  const dmy = text => { const iso = isoOf(text); return iso ? dmyOf(iso) : (String(text || "").trim() || "……/……/……"); };
   document.querySelectorAll("input[data-date]").forEach(el => {
     const p = $(el.id + "-pick");
     // typing only digits fills in the slashes: 23011988 -> 23/01/1988; typing your own "/" turns this off for the field
@@ -393,11 +393,12 @@ table.calc tr.total td { font-weight: 700; font-size: 1.05rem; border-bottom: 0;
     $("p-kdate").textContent = dmy($("kdate").value);
     $("p-client").textContent = txt("client", "");
     $("p-unit").textContent = txt("unit", "");
-    $("p-price").textContent = fmt(num("price"));
+    const noPrice = $("price").value.trim() === "";
+    $("p-price").textContent = noPrice ? "" : fmt(num("price"));
     const exempt = !isC || state.taxed === "no";
     $("p-exempt").innerHTML = `${box(exempt)} نعم &nbsp; / &nbsp; ${box(!exempt)} لا`;
-    $("p-amt").textContent = fmt(r.amount);
-    $("p-words").textContent = tafqeet(r.amount);
+    $("p-amt").textContent = noPrice ? "" : fmt(r.amount);
+    $("p-words").textContent = noPrice ? "……………………………………" : tafqeet(r.amount);
     save();
   }
 

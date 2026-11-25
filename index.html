@@ -159,7 +159,7 @@ table.calc tr.total td { font-weight: 700; font-size: 1.05rem; border-bottom: 0;
       <div id="c-only" style="display:contents">
         <h2>العمولة والضرايب</h2>
         <fieldset>
-          <div class="row"><label for="rate">نسبة العمولة</label><input id="rate" type="text" inputmode="decimal" data-fmt="pct" value="2%"></div>
+          <div class="row"><label for="rate">نسبة العمولة %</label><input id="rate" type="text" inputmode="decimal" data-fmt="pct" value="2%"></div>
           <div class="row"><span class="lbl" id="l-taxed"><label>بيشتغل ضريبي؟</label></span>
             <div class="seg" role="group" aria-labelledby="l-taxed" id="taxed">
               <button type="button" id="taxed-yes" data-v="yes" aria-pressed="true">نعم</button>
@@ -171,8 +171,8 @@ table.calc tr.total td { font-weight: 700; font-size: 1.05rem; border-bottom: 0;
               <button type="button" id="adv-no" data-v="no" aria-pressed="true">لا</button>
             </div></div>
           <p class="hint" id="adv-hint">لو بيدفع دفعات مقدمة للضرايب مش بنخصم منه الـ 5%.</p>
-          <div class="row"><label for="vat">القيمة المضافة</label><input id="vat" type="text" inputmode="decimal" data-fmt="pct" value="14%"></div>
-          <div class="row"><label for="ptax">ضريبة الأرباح</label><input id="ptax" type="text" inputmode="decimal" data-fmt="pct" value="5%"></div>
+          <div class="row"><label for="vat">القيمة المضافة %</label><input id="vat" type="text" inputmode="decimal" data-fmt="pct" value="14%"></div>
+          <div class="row"><label for="ptax">ضريبة الأرباح %</label><input id="ptax" type="text" inputmode="decimal" data-fmt="pct" value="5%"></div>
           <div class="row"><label for="forc">لصالح</label><input id="forc" type="text"></div>
           <div class="row"><label for="nidc">رقم قومي (اختياري)</label><input id="nidc" type="text" inputmode="numeric"></div>
         </fieldset>
@@ -181,7 +181,7 @@ table.calc tr.total td { font-weight: 700; font-size: 1.05rem; border-bottom: 0;
       <div id="i-only" style="display:contents" hidden>
         <h2>الحافز</h2>
         <fieldset>
-          <div class="row"><label for="irate">نسبة الحافز</label><input id="irate" type="text" inputmode="decimal" data-fmt="pct" value="2%"></div>
+          <div class="row"><label for="irate">نسبة الحافز %</label><input id="irate" type="text" inputmode="decimal" data-fmt="pct" value="2%"></div>
           <p class="hint">الحافز مش بيخضع لأي خصومات أو ضرايب: ثمن الوحدة × نسبة الحافز.</p>
           <div class="row"><label for="fori">لصالح (مسئول المبيعات)</label><input id="fori" type="text"></div>
           <div class="row"><label for="nidi">رقم قومي</label><input id="nidi" type="text" inputmode="numeric"></div>
@@ -303,6 +303,25 @@ table.calc tr.total td { font-weight: 700; font-size: 1.05rem; border-bottom: 0;
     if (c === v) return;
     const pos = el.selectionStart;
     el.value = c;
+    try { el.setSelectionRange(pos, pos); } catch {}
+  }, true);
+  // while typing: the price gets its commas (9,350,000) and a rate keeps its % sign; the caret stays after the same digit
+  document.addEventListener("input", e => {
+    const el = e.target;
+    if (!(el instanceof HTMLInputElement) || !el.dataset.fmt) return;
+    const v = el.value, caret = el.selectionStart ?? v.length;
+    const keep = s => s.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1");
+    const digitsBefore = keep(v.slice(0, caret)).length;
+    const raw = keep(v);
+    let out;
+    if (el.dataset.fmt === "money") {
+      const [i, d] = raw.split(".");
+      out = (i || "").replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (d !== undefined ? "." + d : "");
+    } else out = raw === "" ? "" : raw + "%";
+    if (out === v) return;
+    el.value = out;
+    let pos = 0, seen = 0;
+    while (pos < out.length && seen < digitsBefore) { if (/[\d.]/.test(out[pos])) seen++; pos++; }
     try { el.setSelectionRange(pos, pos); } catch {}
   }, true);
   const txt = (id, dots = "……………………") => ($(id).value.trim() || dots);

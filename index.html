@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+</head>
+<body>
+<title>حاسبة مطالبات العمولة</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Noto+Naskh+Arabic:wght@500;700&display=swap">
+<style>
+/* Layout: RTL two-pane workbench — inputs + calc on the right, paper claim preview on the left */
+:root {
+  --bg: #f3f2f0;
+  --panel: #ffffff;
+  --fg: #1d1b1a;
+  --muted: #6b6461;
+  --line: #e2dedb;
+  --accent: #b3232b;
+  --accent-soft: #f7e4e5;
+  --ok: #1f7a4d;
+  --input: #fbf6e6;
+  --paper: #ffffff;
+  --paper-ink: #111111;
+  --font-ui: "IBM Plex Sans Arabic", "Segoe UI", Tahoma, sans-serif;
+  --font-doc: "Noto Naskh Arabic", "Traditional Arabic", "Times New Roman", serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #171514; --panel: #211f1e; --fg: #eeeae7; --muted: #a39b97; --line: #38332f;
+  --accent: #e2565d; --accent-soft: #3a2223; --ok: #5cc28f; --input: #2b2720; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #171514; --panel: #211f1e; --fg: #eeeae7; --muted: #a39b97; --line: #38332f;
+  --accent: #e2565d; --accent-soft: #3a2223; --ok: #5cc28f; --input: #2b2720; color-scheme: dark }
+
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-ui); font-size: 15px; line-height: 1.6 }
+.wrap { max-width: 1280px; margin: 0 auto; padding-block: 24px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 20px }
+h1 { font-size: 1.6rem; margin: 0; text-wrap: balance }
+.sub { color: var(--muted); margin: 2px 0 0; font-size: .92rem }
+.hdr-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center }
+.tabs { display: inline-flex; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 4px; gap: 4px }
+.tabs button { font: inherit; font-weight: 600; border: 0; background: transparent; color: var(--muted); padding: 8px 18px; border-radius: 7px; cursor: pointer }
+.tabs button[aria-selected="true"] { background: var(--accent); color: #fff }
+.tabs button:focus-visible, .seg button:focus-visible, input:focus-visible, .copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+
+.grid { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 20px; align-items: start }
+@media (max-width: 920px) { .grid { grid-template-columns: minmax(0, 1fr) } }
+
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: grid; gap: 16px; min-width: 0 }
+.panel h2 { font-size: .8rem; letter-spacing: .04em; color: var(--muted); margin: 0; font-weight: 600 }
+fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 10px; min-width: 0 }
+.row { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 10px; align-items: center }
+@media (max-width: 420px) { .row { grid-template-columns: minmax(0, 1fr); gap: 4px } }
+label { font-size: .9rem; font-weight: 500 }
+.datebox { display: flex; gap: 6px; min-width: 0 }
+.datebox input[type=text] { flex: 1; min-width: 0; direction: ltr; text-align: right }
+.datebox .pick { flex: 0 0 44px; width: 44px; padding: 7px 8px; color: transparent; cursor: pointer }
+.datebox .pick::-webkit-datetime-edit { display: none }
+.datebox .pick::-webkit-calendar-picker-indicator { margin: 0; cursor: pointer }
+input[type=text], input[type=date] { width: 100%; font: inherit; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--input); color: var(--fg) }
+input[data-fmt] { direction: ltr; text-align: right; font-variant-numeric: tabular-nums }
+input[readonly] { background: transparent; color: var(--muted) }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; width: max-content }
+.seg button { font: inherit; border: 0; padding: 6px 18px; background: transparent; color: var(--fg); cursor: pointer }
+.seg button[aria-pressed="true"] { background: var(--fg); color: var(--panel) }
+.seg button:disabled { opacity: .4; cursor: not-allowed }
+.hint { font-size: .82rem; color: var(--muted); margin: -4px 0 0 }
+
+.method { background: var(--accent-soft); color: var(--accent); font-weight: 600; padding: 8px 12px; border-radius: 8px; font-size: .92rem }
+table.calc { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums }
+table.calc td { padding: 7px 4px; border-bottom: 1px solid var(--line) }
+table.calc td:last-child { text-align: left; white-space: nowrap; direction: ltr; unicode-bidi: plaintext }
+table.calc tr.minus td:last-child { color: var(--accent) }
+table.calc tr.zero td { color: var(--muted) }
+table.calc tr.total td { font-weight: 700; font-size: 1.05rem; border-bottom: 0; border-top: 2px solid var(--fg) }
+
+.copyrow { display: flex; flex-wrap: wrap; gap: 8px }
+.copy { font: inherit; font-size: .88rem; border: 1px solid var(--line); background: var(--panel); color: var(--fg); padding: 6px 12px; border-radius: 8px; cursor: pointer }
+.copy:hover { border-color: var(--accent) }
+.copy.dl { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600 }
+.toast { font-size: .85rem; color: var(--ok); min-height: 1.2em }
+
+/* paper preview: fixed paper look in both themes by choice */
+.paperwrap { min-width: 0; overflow-x: auto }
+.paper { background: var(--paper); color: var(--paper-ink); font-family: var(--font-doc); width: 100%; max-width: 760px; margin: 0 auto;
+  aspect-ratio: 210 / 297; padding: 6% 7%; box-shadow: 0 1px 3px rgba(0,0,0,.12), 0 8px 24px rgba(0,0,0,.08); border-radius: 2px;
+  display: flex; flex-direction: column; gap: .55em; font-size: clamp(11px, 1.55vw, 16px); font-weight: 700; line-height: 1.7 }
+@media (max-width: 920px) { .paper { font-size: clamp(10px, 2.6vw, 16px) } }
+.paper { position: relative }
+.paper .logo { position: absolute; top: 5%; left: 6%; width: 9%; height: auto }
+.paper .co { display: grid; gap: .1em }
+.paper .title { text-align: center; font-size: 2em; text-decoration: underline; text-underline-offset: .25em; margin: .2em 0 .3em }
+.paper .to { color: #c00000; text-decoration: underline }
+.paper .ltr { direction: ltr; unicode-bidi: isolate }
+.paper table { width: 100%; border-collapse: collapse; margin-top: .3em; font-variant-numeric: tabular-nums }
+.paper th { background: #000; color: #fff; text-align: right; padding: .25em .5em }
+.paper td { border: 1px solid #000; padding: .25em .5em }
+.paper td.v { text-align: center; width: 47% }
+.paper .box { display: inline-block; width: .95em; height: .95em; border: 1.5px solid #000; vertical-align: -0.12em; margin-inline: .2em; text-align: center; line-height: .8em; font-size: .9em }
+.paper .tafqeet { margin-top: .4em }
+.paper .sig3 { display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; margin-top: auto; gap: .3em }
+.paper .dots { font-weight: 400; letter-spacing: .1em }
+.paper .sig2 { display: grid; grid-template-columns: 1fr 1fr; border-top: 2px solid #000; padding-top: .4em; margin-top: 1.4em }
+.paper .sig2 div:nth-child(even) { text-align: left }
+.note { font-size: .85rem; color: var(--muted); text-align: center; margin: 10px 0 0 }
+@media print {
+  @page { size: A4 portrait; margin: 0 }
+  html, body { background: #fff !important; margin: 0 }
+  body::before, header, .panel, .note { display: none !important }
+  .wrap { padding: 0 !important; max-width: none !important; margin: 0 !important }
+  .grid { display: block !important }
+  .paperwrap { overflow: visible !important }
+  .paper { width: 210mm !important; height: 296mm !important; max-width: none !important; aspect-ratio: auto !important; margin: 0 !important;
+    padding: 16mm 15mm !important; box-shadow: none !important; border-radius: 0 !important; font-size: 15px !important; overflow: hidden; break-inside: avoid;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact }
+  .paper .logo { top: 14mm !important; left: 13mm !important; width: 19mm !important }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important } }
+</style>
+
+<div class="wrap" dir="rtl" lang="ar">
+  <header>
+    <div>
+      <h1>حاسبة مطالبات العمولة والحافز</h1>
+      <p class="sub">الصفحة بتفتكر آخر مطالبة اشتغلت عليها. دوس "مطالبة جديدة" عشان تفضّي البيانات وتبدأ من الأول.</p>
+    </div>
+    <div class="hdr-actions">
+    <button class="copy" id="new" type="button">مطالبة جديدة</button>
+    <div class="tabs" role="tablist" aria-label="نوع المطالبة">
+      <button id="tab-c" role="tab" aria-selected="true" data-kind="c">مطالبة عمولة</button>
+      <button id="tab-i" role="tab" aria-selected="false" data-kind="i">مطالبة حافز</button>
+    </div>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- inputs + calculation -->
+    <section class="panel" aria-label="البيانات والحساب">
+      <h2>بيانات الشركة</h2>
+      <fieldset>
+        <div class="row"><label for="co">اسم الشركة</label><input id="co" type="text"></div>
+        <div class="row"><label for="cr">رقم السجل التجاري</label><input id="cr" type="text" inputmode="numeric"></div>
+        <div class="row"><label for="tax">رقم البطاقة الضريبية</label><input id="tax" type="text" inputmode="numeric"></div>
+        <div class="row"><label for="cdate">تاريخ المطالبة</label><div class="datebox"><input id="cdate" type="text" inputmode="numeric" autocomplete="off" data-date placeholder="dd/mm/yyyy"><input id="cdate-pick" class="pick" type="date" tabindex="-1" aria-label="اختار تاريخ المطالبة من الكالندر"></div></div>
+      </fieldset>
+
+      <h2>بيانات الوحدة</h2>
+      <fieldset>
+        <div class="row"><label for="proj">المشروع</label><input id="proj" type="text" value="CRCL"></div>
+        <div class="row"><label for="client">اسم العميل</label><input id="client" type="text"></div>
+        <div class="row"><label for="unit">رقم الوحدة</label><input id="unit" type="text"></div>
+        <div class="row"><label for="kdate">تاريخ التعاقد</label><div class="datebox"><input id="kdate" type="text" inputmode="numeric" autocomplete="off" data-date placeholder="dd/mm/yyyy"><input id="kdate-pick" class="pick" type="date" tabindex="-1" aria-label="اختار تاريخ التعاقد من الكالندر"></div></div>
+        <div class="row"><label for="price">اجمالي ثمن الوحدة</label><input id="price" type="text" inputmode="decimal" data-fmt="money"></div>
+      </fieldset>
+
+      <div id="c-only" style="display:contents">
+        <h2>العمولة والضرايب</h2>
+        <fieldset>
+          <div class="row"><label for="rate">نسبة العمولة</label><input id="rate" type="text" inputmode="decimal" data-fmt="pct" value="2%"></div>
+          <div class="row"><span class="lbl" id="l-taxed"><label>بيشتغل ضريبي؟</label></span>
+            <div class="seg" role="group" aria-labelledby="l-taxed" id="taxed">
+              <button type="button" id="taxed-yes" data-v="yes" aria-pressed="true">نعم</button>
+              <button type="button" id="taxed-no" data-v="no" aria-pressed="false">لا</button>
+            </div></div>
+          <div class="row"><span id="l-adv"><label>بيدفع دفعات مقدمة؟</label></span>
+            <div class="seg" role="group" aria-labelledby="l-adv" id="adv">
+              <button type="button" id="adv-yes" data-v="yes" aria-pressed="false">نعم</button>
+              <button type="button" id="adv-no" data-v="no" aria-pressed="true">لا</button>
+            </div></div>
+          <p class="hint" id="adv-hint">لو بيدفع دفعات مقدمة للضرايب مش بنخصم منه الـ 5%.</p>
+          <div class="row"><label for="vat">القيمة المضافة</label><input id="vat" type="text" inputmode="decimal" data-fmt="pct" value="14%"></div>
+          <div class="row"><label for="ptax">ضريبة الأرباح</label><input id="ptax" type="text" inputmode="decimal" data-fmt="pct" value="5%"></div>
+          <div class="row"><label for="forc">لصالح</label><input id="forc" type="text"></div>
+          <div class="row"><label for="nidc">رقم قومي (اختياري)</label><input id="nidc" type="text" inputmode="numeric"></div>
+        </fieldset>
+      </div>
+
+      <div id="i-only" style="display:contents" hidden>
+        <h2>الحافز</h2>
+        <fieldset>
+          <div class="row"><label for="irate">نسبة الحافز</label><input id="irate" type="text" inputmode="decimal" data-fmt="pct" value="2%"></div>
+          <p class="hint">الحافز مش بيخضع لأي خصومات أو ضرايب: ثمن الوحدة × نسبة الحافز.</p>
+          <div class="row"><label for="fori">لصالح (مسئول المبيعات)</label><input id="fori" type="text"></div>
+          <div class="row"><label for="nidi">رقم قومي</label><input id="nidi" type="text" inputmode="numeric"></div>
+        </fieldset>
+      </div>
+
+      <h2>الحساب</h2>
+      <div class="method" id="method"></div>
+      <table class="calc" id="calc"></table>
+      <div class="copyrow">
+        <button class="copy" id="copy-amt" type="button">نسخ المبلغ</button>
+        <button class="copy" id="copy-words" type="button">نسخ التفقيط</button>
+        <button class="copy dl" id="dl" type="button" hidden>طباعة المطالبة</button>
+      </div>
+      <div class="toast" id="toast" role="status"></div>
+    </section>
+
+    <!-- paper preview -->
+    <section class="paperwrap" aria-label="شكل المطالبة">
+      <article class="paper" id="paper">
+        <img class="logo" alt="" src="data:image/png;base64,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">
+        <div class="co">
+          <div>شركة: <span id="p-co"></span></div>
+          <div>سجل تجاري : <span id="p-cr"></span></div>
+          <div>بطاقة ضريبيه : <span id="p-tax"></span></div>
+        </div>
+        <div class="title">مطالبة عمولة</div>
+        <div>انه بتاريخ : <span id="p-cdate" class="ltr"></span></div>
+        <div class="to">السادة شركة/ <span class="ltr">C Developments</span></div>
+        <div>تحية طيبه و بعد........</div>
+        <div>الموضوع / مستحقات عمولة <span id="p-subj"></span> لمشروع (<span id="p-proj" class="ltr"></span>)</div>
+        <div>لصالح : <span id="p-for"></span></div>
+        <div>رقم قومي: <span id="p-nid"></span></div>
+        <div>بالاشارة الي الموضوع عاليه و طبقا لبروتوكول التعامل مع شركتكم الموقره</div>
+        <div>برجاء التكرم بسداد العمولة طبقا للجدول التالي:.</div>
+        <table>
+          <thead><tr><th>البيان</th><th>القيمه</th></tr></thead>
+          <tbody>
+            <tr><td>تاريخ العقد</td><td class="v ltr" id="p-kdate"></td></tr>
+            <tr><td>اسم العميل</td><td class="v" id="p-client"></td></tr>
+            <tr><td>رقم الوحدة</td><td class="v ltr" id="p-unit"></td></tr>
+            <tr><td>اجمالي ثمن الوحدة</td><td class="v" id="p-price"></td></tr>
+            <tr><td>معفي من الضرايب</td><td class="v" id="p-exempt"></td></tr>
+            <tr><td>صافى قيمة عمولة <span id="p-kind"></span></td><td class="v" id="p-amt"></td></tr>
+          </tbody>
+        </table>
+        <div class="tafqeet">تفقيط العموله : <span id="p-words"></span></div>
+        <div class="sig3">
+          <div>الــخــتــم</div><div>الــتــوقــيــع</div><div>رقم التليفون</div>
+          <div class="dots">………………</div><div class="dots">………………</div><div class="dots">………………</div>
+        </div>
+        <div class="sig2">
+          <div>توقيع مدير ادارة العمليات</div><div>توقيع رئيس القطاع التجاري</div>
+          <div class="dots">……………………</div><div class="dots">……………………</div>
+        </div>
+      </article>
+      <p class="note" id="note">دوس "طباعة المطالبة" والورقة بتتطبع لوحدها على A4.</p>
+    </section>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const ON = "☑", OFF = "☐";
+  const state = { kind: "c", taxed: "yes", adv: "no" };
+
+  // ---------- Arabic tafqeet (same rules as the Excel sheet) ----------
+  const ONES = ["", "واحد", "اثنان", "ثلاثة", "أربعة", "خمسة", "ستة", "سبعة", "ثمانية", "تسعة"];
+  const TEENS = ["عشرة", "أحد عشر", "اثنا عشر", "ثلاثة عشر", "أربعة عشر", "خمسة عشر", "ستة عشر", "سبعة عشر", "ثمانية عشر", "تسعة عشر"];
+  const TENS = ["", "", "عشرون", "ثلاثون", "أربعون", "خمسون", "ستون", "سبعون", "ثمانون", "تسعون"];
+  const HUND = ["", "مائة", "مائتان", "ثلاثمائة", "أربعمائة", "خمسمائة", "ستمائة", "سبعمائة", "ثمانمائة", "تسعمائة"];
+  function w999(n) {
+    const h = Math.floor(n / 100), r = n % 100, p = [];
+    if (h) p.push(HUND[h]);
+    if (r) {
+      if (r < 10) p.push(ONES[r]);
+      else if (r < 20) p.push(TEENS[r - 10]);
+      else { const t = Math.floor(r / 10), o = r % 10; p.push(o ? ONES[o] + " و" + TENS[t] : TENS[t]); }
+    }
+    return p.join(" و");
+  }
+  function scale(n, one, two, plural, many) {
+    if (!n) return "";
+    if (n === 1) return one;
+    if (n === 2) return two;
+    if (n <= 10) return w999(n) + " " + plural;
+    return w999(n) + " " + many;
+  }
+  function tafqeet(amount) {
+    const n = Math.round(amount);
+    if (!n) return "فقط صفر جنيهاً مصرياً لا غير";
+    const m = Math.floor(n / 1e6), t = Math.floor((n % 1e6) / 1000), u = n % 1000;
+    const parts = [scale(m, "مليون", "مليونان", "ملايين", "مليون"), scale(t, "ألف", "ألفان", "آلاف", "ألف"), u ? w999(u) : ""].filter(Boolean);
+    return "فقط " + parts.join(" و ") + " جنيهاً مصرياً لا غير";
+  }
+
+  const fmt = n => (Math.round(n) || 0).toLocaleString("en-US");
+  const parse = s => { const v = parseFloat(String(s).replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/[٫]/g, ".").replace(/[^\d.]/g, "")); return isFinite(v) ? v : 0; };
+  const num = id => parse($(id).value);
+  // show 9,350,000 for money and 2% for rates once the field is left
+  function pretty(el) {
+    if (!el.dataset.fmt || el.value.trim() === "") return;
+    const v = parse(el.value);
+    el.value = el.dataset.fmt === "pct" ? v + "%" : Math.round(v).toLocaleString("en-US");
+  }
+  document.querySelectorAll("input[data-fmt]").forEach(el => el.addEventListener("blur", () => { pretty(el); save(); }));
+  // rate boxes: clicking or tabbing in selects the whole value, so typing replaces it straight away
+  document.querySelectorAll('input[data-fmt]').forEach(el => {
+    el.addEventListener("focus", () => setTimeout(() => { try { el.select(); } catch {} }, 0));
+    el.addEventListener("mouseup", e => e.preventDefault());
+  });
+  // Arabic or Persian digits typed in any box turn into English digits right away (capture phase: runs before the other listeners)
+  const toLatin = s => s.replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/[۰-۹]/g, d => "۰۱۲۳۴۵۶۷۸۹".indexOf(d)).replace(/٫/g, ".").replace(/٬/g, ",");
+  document.addEventListener("input", e => {
+    const el = e.target;
+    if (!(el instanceof HTMLInputElement) || el.type !== "text") return;
+    const v = el.value, c = toLatin(v);
+    if (c === v) return;
+    const pos = el.selectionStart;
+    el.value = c;
+    try { el.setSelectionRange(pos, pos); } catch {}
+  }, true);
+  const txt = (id, dots = "……………………") => ($(id).value.trim() || dots);
+  // dates: type them (23/7/2026, 23-07-2026 …) or pick them from the calendar button; shown as dd/mm/yyyy
+  const pad = n => String(n).padStart(2, "0");
+  function isoOf(text) {
+    const t = String(text || "").trim().replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d));
+    let m = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/.exec(t), y, mo, d;
+    if (m) { y = +m[1]; mo = +m[2]; d = +m[3]; }
+    else if ((m = /^(\d{1,2})[-/. ](\d{1,2})[-/. ](\d{2}|\d{4})$/.exec(t)) || (m = /^(\d{2})(\d{2})(\d{4}|\d{2})$/.exec(t))) { d = +m[1]; mo = +m[2]; y = +m[3]; if (y < 100) y += 2000; }
+    else return "";
+    const dt = new Date(y, mo - 1, d);
+    if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return "";
+    return `${y}-${pad(mo)}-${pad(d)}`;
+  }
+  const dmyOf = iso => { if (!iso) return ""; const [y, m, d] = iso.split("-"); return `${d}/${m}/${y}`; };
+  const dmy = text => { const iso = isoOf(text); return iso ? dmyOf(iso) : (String(text || "").trim() || "……/……/202…"); };
+  document.querySelectorAll("input[data-date]").forEach(el => {
+    const p = $(el.id + "-pick");
+    // typing only digits fills in the slashes: 23011988 -> 23/01/1988; typing your own "/" turns this off for the field
+    el.addEventListener("input", e => {
+      if (el.value.trim() === "") { delete el.dataset.manual; return; }
+      if ((e.inputType || "").startsWith("delete")) return;
+      if (/[-./ ]/.test(e.data || "")) { el.dataset.manual = "1"; return; }
+      if (el.dataset.manual) return;
+      const d = el.value.replace(/\D/g, "").slice(0, 8);
+      const out = d.length > 4 ? `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}` : d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d;
+      if (out !== el.value) { el.value = out; try { el.setSelectionRange(out.length, out.length); } catch {} }
+    });
+    el.addEventListener("input", () => { const iso = isoOf(el.value); if (iso) p.value = iso; });
+    el.addEventListener("blur", () => { const iso = isoOf(el.value); if (iso) { el.value = dmyOf(iso); p.value = iso; delete el.dataset.manual; } save(); });
+    p.addEventListener("click", () => { try { p.showPicker(); } catch {} });
+    p.addEventListener("input", () => { if (p.value) { el.value = dmyOf(p.value); el.dispatchEvent(new Event("input", { bubbles: true })); } });
+  });
+  const syncPicks = () => document.querySelectorAll("input[data-date]").forEach(el => { const iso = isoOf(el.value); $(el.id + "-pick").value = iso; if (iso) el.value = dmyOf(iso); });
+
+  function compute() {
+    const price = num("price");
+    if (state.kind === "i") {
+      const gross = Math.round(price * num("irate") / 100);
+      return { amount: gross, method: "حافز: ثمن الوحدة × نسبة الحافز (من غير خصومات)",
+        rows: [["ثمن الوحدة", price], ["نسبة الحافز", num("irate") + "%"], ["الحافز المستحق", gross, "total"]] };
+    }
+    const gross = Math.round(price * num("rate") / 100);
+    const afterVat = Math.round(gross / (1 + num("vat") / 100));
+    const vat = gross - afterVat;
+    const taxed = state.taxed === "yes", adv = state.adv === "yes";
+    const profit = taxed && !adv ? Math.round(afterVat * num("ptax") / 100) : 0;
+    const vatCut = taxed ? 0 : vat;
+    const amount = gross - profit - vatCut;
+    const method = !taxed ? "غير ضريبي: العمولة − قيمة القيمة المضافة اللي جواها"
+      : adv ? "ضريبي + دفعات مقدمة: العمولة كاملة من غير أي خصم"
+      : "ضريبي من غير دفعات مقدمة: العمولة − 5% أرباح من العمولة بعد القيمة المضافة";
+    return { amount, method, rows: [
+      ["العمولة كلها (ثمن الوحدة × " + num("rate") + "%)", gross],
+      ["قيمة القيمة المضافة اللي جواها (" + num("vat") + "%)", vat, "info"],
+      ["العمولة بعد القيمة المضافة", afterVat, "info"],
+      ["خصم ضريبة الأرباح " + num("ptax") + "%", -profit, profit ? "minus" : "zero"],
+      ["خصم القيمة المضافة (غير ضريبي)", -vatCut, vatCut ? "minus" : "zero"],
+      ["المستحق", amount, "total"]] };
+  }
+
+  function render() {
+    const isC = state.kind === "c";
+    $("c-only").hidden = !isC; $("i-only").hidden = isC;
+    $("c-only").style.display = isC ? "contents" : "none";
+    $("i-only").style.display = isC ? "none" : "contents";
+    for (const b of document.querySelectorAll(".tabs button")) b.setAttribute("aria-selected", String(b.dataset.kind === state.kind));
+    for (const g of ["taxed", "adv"]) for (const b of $(g).querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.v === state[g]));
+    const advOff = state.taxed === "no";
+    for (const b of $("adv").querySelectorAll("button")) b.disabled = advOff;
+    $("adv-hint").textContent = advOff ? "غير ضريبي: مفيش 5% أرباح أصلاً، السؤال ده مش بيفرق." : "لو بيدفع دفعات مقدمة للضرايب مش بنخصم منه الـ 5%.";
+
+    const r = compute();
+    $("method").textContent = r.method;
+    $("calc").innerHTML = r.rows.map(([l, v, cls]) =>
+      `<tr class="${cls || ""}"><td>${l}</td><td>${typeof v === "number" ? (v < 0 ? "− " + fmt(-v) : fmt(v)) : v}</td></tr>`).join("");
+
+    // paper
+    $("p-co").textContent = txt("co"); $("p-cr").textContent = txt("cr"); $("p-tax").textContent = txt("tax");
+    $("p-cdate").textContent = dmy($("cdate").value);
+    $("p-proj").textContent = txt("proj", "……");
+    const box = on => `<span class="box">${on ? "✓" : ""}</span>`;
+    $("p-subj").innerHTML = `${box(!isC)} حافز / ${box(isC)} شركة`;
+    $("p-kind").innerHTML = `${box(!isC)} حافز / ${box(isC)} شركة`;
+    $("p-for").textContent = isC ? ($("forc").value.trim() || txt("co")) : txt("fori");
+    $("p-nid").textContent = txt(isC ? "nidc" : "nidi");
+    $("p-kdate").textContent = dmy($("kdate").value);
+    $("p-client").textContent = txt("client", "");
+    $("p-unit").textContent = txt("unit", "");
+    $("p-price").textContent = fmt(num("price"));
+    const exempt = !isC || state.taxed === "no";
+    $("p-exempt").innerHTML = `${box(exempt)} نعم &nbsp; / &nbsp; ${box(!exempt)} لا`;
+    $("p-amt").textContent = fmt(r.amount);
+    $("p-words").textContent = tafqeet(r.amount);
+    save();
+  }
+
+  // ---------- events ----------
+  document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => { state.kind = b.dataset.kind; render(); }));
+  ["taxed", "adv"].forEach(g => $(g).querySelectorAll("button").forEach(b => b.addEventListener("click", () => { state[g] = b.dataset.v; render(); })));
+  document.querySelectorAll("input").forEach(i => i.addEventListener("input", render));
+
+  const toast = msg => { $("toast").textContent = msg; clearTimeout(toast.t); toast.t = setTimeout(() => $("toast").textContent = "", 2500); };
+  function copy(text, label) {
+    const fallback = () => { const s = window.getSelection(), rg = document.createRange(); rg.selectNodeContents(label === "التفقيط" ? $("p-words") : $("p-amt")); s.removeAllRanges(); s.addRange(rg); toast("النسخ مش متاح هنا: النص متعلّم، دوس Cmd+C"); };
+    try { navigator.clipboard.writeText(text).then(() => toast("اتنسخ " + label), fallback); } catch { fallback(); }
+  }
+  $("copy-amt").addEventListener("click", () => copy(String(compute().amount), "المبلغ"));
+  $("copy-words").addEventListener("click", () => copy(tafqeet(compute().amount), "التفقيط"));
+
+  // ---------- download a standalone A4 page that prints itself ----------
+  const PRINT_CSS = `@page{size:A4 portrait;margin:0}html,body{margin:0;padding:0;background:#e9e9e9;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{font-family:"Noto Naskh Arabic","Traditional Arabic","Times New Roman",serif}
+.paper{width:210mm;height:296mm;margin:10mm auto;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.18);overflow:hidden;break-inside:avoid;page-break-after:avoid;box-sizing:border-box;padding:16mm 15mm;color:#111;display:flex;flex-direction:column;gap:.55em;font-size:15px;font-weight:700;line-height:1.7;direction:rtl}
+.paper{position:relative}.logo{position:absolute;top:14mm;left:13mm;width:19mm;height:auto}.co{display:grid;gap:.1em}.title{text-align:center;font-size:2em;text-decoration:underline;text-underline-offset:.25em;margin:.2em 0 .3em}
+.to{color:#c00000;text-decoration:underline}.ltr{direction:ltr;unicode-bidi:isolate}
+table{width:100%;border-collapse:collapse;margin-top:.3em}th{background:#000;color:#fff;text-align:right;padding:.25em .5em;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+td{border:1px solid #000;padding:.25em .5em}td.v{text-align:center;width:47%}
+.box{display:inline-block;width:.95em;height:.95em;border:1.5px solid #000;vertical-align:-.12em;margin-inline:.2em;text-align:center;line-height:.8em;font-size:.9em}
+.tafqeet{margin-top:.4em}.sig3{display:grid;grid-template-columns:repeat(3,1fr);text-align:center;margin-top:auto;gap:.3em}
+.dots{font-weight:400;letter-spacing:.1em}.sig2{display:grid;grid-template-columns:1fr 1fr;border-top:2px solid #000;padding-top:.4em;margin-top:1.4em}.sig2 div:nth-child(even){text-align:left}
+.bar{position:fixed;top:8px;left:8px;font-family:sans-serif}@media print{.bar{display:none}html,body{background:#fff}.paper{margin:0;box-shadow:none}}`;
+  function printableHtml(title) {
+    const esc = t => t.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+    return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${esc(title)}</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;700&display=swap">
+<style>${PRINT_CSS}</style></head><body>
+<div class="bar"><button onclick="print()">طباعة</button></div>
+${$("paper").outerHTML}
+<script>window.addEventListener("load",function(){setTimeout(function(){print()},500)})<\/script>
+</body></html>`;
+  }
+  function fileTitle() {
+    const kind = state.kind === "c" ? "عمولة" : "حافز";
+    const co = ($("co").value.trim() || "شركة").replace(/[\\/:*?"<>|]+/g, " ").trim();
+    return `مطالبة ${kind} - ${co}`;
+  }
+  // standalone file: print straight from the page (only the A4 claim prints)
+  $("dl").hidden = false;
+  $("dl").addEventListener("click", () => {
+    const old = document.title;
+    document.title = fileTitle();          // "Save as PDF" suggests this name
+    window.print();
+    setTimeout(() => { document.title = old; }, 1000);
+  });
+
+  // ---------- remember the last claim in this browser; "مطالبة جديدة" empties it ----------
+  const KEY = "claims-calc-file-v1";
+  let ready = false;
+  function save() {
+    if (!ready) return;
+    try { const d = { state, v: {} }; document.querySelectorAll("input").forEach(i => d.v[i.id] = i.value); localStorage.setItem(KEY, JSON.stringify(d)); } catch {}
+  }
+  try { localStorage.removeItem("claims-calc-v1"); } catch {}
+  const today = () => { const t = new Date(); return new Date(t - t.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+  const DEFAULTS = {};
+  document.querySelectorAll("input").forEach(i => DEFAULTS[i.id] = i.value);
+  function fresh() {
+    // a new claim empties every box: names, numbers, dates, project and rates
+    document.querySelectorAll("input").forEach(i => { i.value = ""; delete i.dataset.manual; });
+    $("vat").value = "14%"; $("ptax").value = "5%"; // fixed tax rates come back on every new claim
+    Object.assign(state, { kind: "c", taxed: "yes", adv: "no" });
+    syncPicks();
+    render();
+  }
+  $("new").addEventListener("click", () => { fresh(); $("co").focus(); toast("اتمسحت البيانات: مطالبة جديدة"); });
+  let restored = false;
+  try {
+    const d = JSON.parse(localStorage.getItem(KEY) || "null");
+    if (d && d.v) {
+      Object.assign(state, d.state || {});
+      for (const [k, v] of Object.entries(d.v)) if ($(k)) $(k).value = v;
+      restored = true;
+    }
+  } catch {}
+  ready = true;
+  if (restored) { document.querySelectorAll("input[data-fmt]").forEach(pretty); syncPicks(); render(); } else fresh();
+})();
+</script>
+
+</body>
+</html>

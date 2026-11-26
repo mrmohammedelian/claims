@@ -154,6 +154,12 @@ table.calc tr.total td { font-weight: 700; font-size: 1.05rem; border-bottom: 0;
         <div class="row"><label for="unit">رقم الوحدة</label><input id="unit" type="text"></div>
         <div class="row"><label for="kdate">تاريخ التعاقد</label><div class="datebox"><input id="kdate" type="text" inputmode="numeric" autocomplete="off" data-date placeholder="dd/mm/yyyy"><input id="kdate-pick" class="pick" type="date" tabindex="-1" aria-label="اختار تاريخ التعاقد من الكالندر"></div></div>
         <div class="row"><label for="price">اجمالي ثمن الوحدة</label><input id="price" type="text" inputmode="decimal" data-fmt="money"></div>
+        <div class="row"><span id="l-exempt"><label>معفي من الضرايب؟</label></span>
+          <div class="seg" role="group" aria-labelledby="l-exempt" id="exempt">
+            <button type="button" id="exempt-yes" data-v="yes" aria-pressed="false">نعم</button>
+            <button type="button" id="exempt-no" data-v="no" aria-pressed="true">لا</button>
+          </div></div>
+        <p class="hint">ده بيعلّم الخانة في الورقة بس، ومالوش أي علاقة بالحسابات.</p>
       </fieldset>
 
       <div id="c-only" style="display:contents">
@@ -247,7 +253,7 @@ table.calc tr.total td { font-weight: 700; font-size: 1.05rem; border-bottom: 0;
 (() => {
   const $ = id => document.getElementById(id);
   const ON = "☑", OFF = "☐";
-  const state = { kind: "c", taxed: "yes", adv: "no" };
+  const state = { kind: "c", taxed: "yes", adv: "no", exempt: "no" };
 
   // ---------- Arabic tafqeet (same rules as the Excel sheet) ----------
   const ONES = ["", "واحد", "اثنان", "ثلاثة", "أربعة", "خمسة", "ستة", "سبعة", "ثمانية", "تسعة"];
@@ -390,7 +396,7 @@ table.calc tr.total td { font-weight: 700; font-size: 1.05rem; border-bottom: 0;
     $("c-only").style.display = isC ? "contents" : "none";
     $("i-only").style.display = isC ? "none" : "contents";
     for (const b of document.querySelectorAll(".tabs button")) b.setAttribute("aria-selected", String(b.dataset.kind === state.kind));
-    for (const g of ["taxed", "adv"]) for (const b of $(g).querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.v === state[g]));
+    for (const g of ["taxed", "adv", "exempt"]) for (const b of $(g).querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.v === state[g]));
     const advOff = state.taxed === "no";
     for (const b of $("adv").querySelectorAll("button")) b.disabled = advOff;
     $("adv-hint").textContent = advOff ? "غير ضريبي: مفيش 5% أرباح أصلاً، السؤال ده مش بيفرق." : "لو بيدفع دفعات مقدمة للضرايب مش بنخصم منه الـ 5%.";
@@ -414,7 +420,7 @@ table.calc tr.total td { font-weight: 700; font-size: 1.05rem; border-bottom: 0;
     $("p-unit").textContent = txt("unit", "");
     const noPrice = $("price").value.trim() === "";
     $("p-price").textContent = noPrice ? "" : fmt(num("price"));
-    const exempt = !isC || state.taxed === "no";
+    const exempt = state.exempt === "yes"; // its own question, separate from the tax calculation
     $("p-exempt").innerHTML = `${box(exempt)} نعم &nbsp; / &nbsp; ${box(!exempt)} لا`;
     $("p-amt").textContent = noPrice ? "" : fmt(r.amount);
     $("p-words").textContent = noPrice ? "……………………………………" : tafqeet(r.amount);
@@ -423,7 +429,7 @@ table.calc tr.total td { font-weight: 700; font-size: 1.05rem; border-bottom: 0;
 
   // ---------- events ----------
   document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => { state.kind = b.dataset.kind; render(); }));
-  ["taxed", "adv"].forEach(g => $(g).querySelectorAll("button").forEach(b => b.addEventListener("click", () => { state[g] = b.dataset.v; render(); })));
+  ["taxed", "adv", "exempt"].forEach(g => $(g).querySelectorAll("button").forEach(b => b.addEventListener("click", () => { state[g] = b.dataset.v; render(); })));
   document.querySelectorAll("input").forEach(i => i.addEventListener("input", render));
 
   const toast = msg => { $("toast").textContent = msg; clearTimeout(toast.t); toast.t = setTimeout(() => $("toast").textContent = "", 2500); };
@@ -485,7 +491,7 @@ ${$("paper").outerHTML}
     // a new claim empties every box: names, numbers, dates, project and rates
     document.querySelectorAll("input").forEach(i => { i.value = ""; delete i.dataset.manual; });
     $("vat").value = "14%"; $("ptax").value = "5%"; // fixed tax rates come back on every new claim
-    Object.assign(state, { kind: "c", taxed: "yes", adv: "no" });
+    Object.assign(state, { kind: "c", taxed: "yes", adv: "no", exempt: "no" });
     syncPicks();
     render();
   }
